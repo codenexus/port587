@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Port587</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #18181f;
+      --border: #2a2a35;
+      --border-active: #4a4a6a;
+      --text: #e8e8f0;
+      --text-dim: #7070a0;
+      --text-dimmer: #404060;
+      --accent: #5b7fff;
+      --accent-dim: #2a3a7a;
+      --accent-glow: rgba(91, 127, 255, 0.15);
+      --green: #4aff8c;
+      --green-dim: #0d3320;
+      --red: #ff4a6e;
+      --red-dim: #3d0d1a;
+      --yellow: #ffcc4a;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.25;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #app {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: var(--text-dimmer);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .profile-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    select {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237070a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      padding-right: 26px;
+    }
+
+    select:focus { border-color: var(--accent); }
+
+    .btn {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 7px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      background: var(--surface2);
+      color: var(--text-dim);
+      transition: all 0.15s;
+      white-space: nowrap;
+      letter-spacing: 0.3px;
+    }
+
+    .btn:hover {
+      border-color: var(--border-active);
+      color: var(--text);
+      background: var(--surface);
+    }
+
+    .btn-icon { padding: 7px 9px; line-height: 1; }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      padding: 9px 20px;
+    }
+
+    .btn-primary:hover {
+      background: #7090ff;
+      border-color: #7090ff;
+      color: #fff;
+    }
+
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-danger { color: var(--red); border-color: transparent; }
+
+    .btn-danger:hover {
+      border-color: var(--red);
+      background: var(--red-dim);
+      color: var(--red);
+    }
+
+    .btn-ghost { border-color: transparent; background: transparent; }
+
+    .btn-ghost:hover {
+      background: var(--surface2);
+      border-color: var(--border);
+    }
+
+    .profile-detail {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: var(--bg);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      line-height: 1.8;
+    }
+
+    .profile-detail .kv { display: flex; gap: 8px; }
+    .profile-detail .k { color: var(--text-dimmer); min-width: 60px; }
+    .profile-detail .v { color: var(--text); }
+
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    .badge-smtp { background: var(--accent-dim); color: var(--accent); }
+    .badge-http { background: #1a2a1a; color: var(--green); }
+
+    .template-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .template-item {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      color: var(--text-dim);
+      transition: all 0.12s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .template-item:hover {
+      background: var(--surface2);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .template-item .t-icon { font-size: 13px; flex-shrink: 0; }
+
+    .compose-column {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .compose {
+      display: flex;
+      flex-direction: column;
+      padding: 24px 24px 24px 28px;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .compose-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-shrink: 0;
+    }
+
+    .compose-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .field {
+      display: flex;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--border);
+      min-height: 44px;
+    }
+
+    .field:last-of-type {
+      border-bottom: none;
+      flex: 1;
+    }
+
+    .field-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dimmer);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 13px 16px 12px 12px;
+      min-width: 80px;
+      flex-shrink: 0;
+    }
+
+    .field input,
+    .field textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      padding: 12px 0;
+      outline: none;
+      resize: none;
+      line-height: 1.5;
+    }
+
+    .field input::placeholder,
+    .field textarea::placeholder { color: var(--text-dimmer); }
+
+    .field textarea {
+      height: 100%;
+      min-height: 200px;
+      padding-top: 14px;
+    }
+
+    .compose-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .send-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .send-status {
+      font-family: var(--mono);
+      font-size: 12px;
+      flex: 1;
+    }
+
+    .status-idle { color: var(--text-dimmer); }
+    .status-sending { color: var(--yellow); }
+    .status-ok { color: var(--green); }
+    .status-err { color: var(--red); }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 480px;
+      max-width: 95vw;
+      padding: 24px;
+      animation: modalIn 0.15s ease;
+    }
+
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .modal-title {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 20px;
+    }
+
+    .form-group { margin-bottom: 14px; }
+
+    .form-group label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      color: var(--text-dimmer);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 9px 12px;
+      border-radius: 4px;
+      outline: none;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--accent); }
+
+    .form-group select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237070a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .smtp-fields, .http-fields { display: none; }
+    .smtp-fields.active, .http-fields.active { display: contents; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-active); }
+
+    @media (max-width: 720px) {
+      main { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">PORT<span>587</span></div>
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-icon" id="btn-clear" title="Clear compose">⌫</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Relay Profile</div>
+        <div class="profile-row">
+          <select id="profile-select">
+            <option value="">— no profiles —</option>
+          </select>
+          <button class="btn btn-icon" id="btn-add-profile" title="Add profile">+</button>
+          <button class="btn btn-icon btn-ghost" id="btn-edit-profile" title="Edit profile">✎</button>
+          <button class="btn btn-icon btn-danger btn-ghost" id="btn-delete-profile" title="Delete profile">✕</button>
+        </div>
+        <div class="profile-detail" id="profile-detail" style="display:none"></div>
+      </div>
+      <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+        <div class="sidebar-label">Templates</div>
+        <div class="template-list" id="template-list"></div>
+      </div>
+    </aside>
+
+    <div class="compose-column">
+      <div class="compose">
+        <div class="compose-header">
+          <div class="compose-title">Compose</div>
+        </div>
+        <div class="compose-card">
+          <div class="field">
+            <div class="field-label">From</div>
+            <input type="email" id="f-from" placeholder="sender@example.com" />
+          </div>
+          <div class="field">
+            <div class="field-label">Reply-To</div>
+            <input type="email" id="f-replyto" placeholder="optional" />
+          </div>
+          <div class="field">
+            <div class="field-label">To</div>
+            <input type="email" id="f-to" placeholder="recipient@example.com" />
+          </div>
+          <div class="field">
+            <div class="field-label">Subject</div>
+            <input type="text" id="f-subject" placeholder="Subject line" />
+          </div>
+          <div class="field">
+            <div class="field-label">Body</div>
+            <textarea id="f-body" placeholder="Message body..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="send-bar">
+        <div class="send-status status-idle" id="send-status">ready</div>
+        <button class="btn btn-primary" id="btn-send">Send</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modal-profile">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">New Profile</div>
+    <div class="form-group">
+      <label>Profile Name</label>
+      <input type="text" id="p-name" placeholder="e.g. M365 Relay" />
+    </div>
+    <div class="form-group">
+      <label>Type</label>
+      <select id="p-type">
+        <option value="smtp">SMTP</option>
+        <option value="http">HTTP Endpoint</option>
+      </select>
+    </div>
+    <div class="smtp-fields active" id="smtp-fields">
+      <div class="form-group">
+        <label>Host</label>
+        <input type="text" id="p-host" placeholder="smtp.office365.com" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Port</label>
+          <input type="number" id="p-port" placeholder="587" value="587" />
+        </div>
+        <div class="form-group">
+          <label>Security</label>
+          <select id="p-security">
+            <option value="starttls">STARTTLS</option>
+            <option value="tls">TLS/SSL</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Username (optional)</label>
+        <input type="text" id="p-username" placeholder="user@domain.com" />
+      </div>
+      <div class="form-group">
+        <label>Password (optional)</label>
+        <input type="password" id="p-password" placeholder="••••••••" />
+      </div>
+    </div>
+    <div class="http-fields" id="http-fields">
+      <div class="form-group">
+        <label>Endpoint URL</label>
+        <input type="url" id="p-url" placeholder="https://relay.example.com/send" />
+      </div>
+      <div class="form-group">
+        <label>Auth Header (optional)</label>
+        <input type="text" id="p-auth-header" placeholder="Bearer token123" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="btn-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-modal-save">Save Profile</button>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
