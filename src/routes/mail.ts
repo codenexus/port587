@@ -49,6 +49,9 @@ mail.post('/send', async (c) => {
       const secure = security === 'tls'
       const requireTLS = security === 'starttls'
 
+      // Capture debug transcript
+      const transcript: string[] = []
+
       const transporter = nodemailer.createTransport({
         host,
         port,
@@ -56,8 +59,17 @@ mail.post('/send', async (c) => {
         requireTLS,
         auth: username ? { user: username, pass: password } : undefined,
         tls: {
-          // Allow self-signed certs in dev — tighten this for prod if needed
           rejectUnauthorized: false,
+        },
+        debug: true,
+        logger: {
+          level: () => {},
+          trace: (...args: any[]) => { const line = args.join(' '); transcript.push(`TRACE ${line}`); console.log('SMTP TRACE:', line) },
+          debug: (...args: any[]) => { const line = args.join(' '); transcript.push(`DEBUG ${line}`); console.log('SMTP DEBUG:', line) },
+          info:  (...args: any[]) => { const line = args.join(' '); transcript.push(`INFO  ${line}`); console.log('SMTP INFO:', line) },
+          warn:  (...args: any[]) => { const line = args.join(' '); transcript.push(`WARN  ${line}`); console.warn('SMTP WARN:', line) },
+          error: (...args: any[]) => { const line = args.join(' '); transcript.push(`ERROR ${line}`); console.error('SMTP ERROR:', line) },
+          fatal: (...args: any[]) => { const line = args.join(' '); transcript.push(`FATAL ${line}`); console.error('SMTP FATAL:', line) },
         },
       })
 
@@ -73,6 +85,7 @@ mail.post('/send', async (c) => {
         success: true,
         messageId: info.messageId,
         response: info.response,
+        transcript,
       })
     } else if (profile.type === 'http') {
       const { url, authHeader } = profile

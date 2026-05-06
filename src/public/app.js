@@ -351,8 +351,10 @@ async function send() {
     const data = await res.json()
     if (!res.ok) {
       setStatus(`error: ${data.error || res.statusText}`, 'err')
+      if (data.transcript) showTranscript(data.transcript)
     } else {
       setStatus(`sent ✓  ${data.messageId || data.response || ''}`, 'ok')
+      if (data.transcript) showTranscript(data.transcript)
     }
   } catch (err) {
     setStatus(`request failed: ${err.message}`, 'err')
@@ -375,6 +377,60 @@ function getApiKey() {
     if (key) sessionStorage.setItem('port587_api_key', key)
   }
   return key
+}
+
+function showTranscript(lines) {
+  let panel = document.getElementById('transcript-panel')
+  if (!panel) {
+    panel = document.createElement('div')
+    panel.id = 'transcript-panel'
+    panel.style.cssText = `
+      position: fixed;
+      bottom: 60px;
+      right: 24px;
+      width: 600px;
+      max-height: 400px;
+      background: var(--bg);
+      border: 1px solid var(--border-active);
+      border-radius: 6px;
+      overflow-y: auto;
+      z-index: 150;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.6;
+    `
+    const header = document.createElement('div')
+    header.style.cssText = `
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+    `
+    header.innerHTML = `
+      <span style="color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; font-size: 10px;">SMTP Transcript</span>
+      <button onclick="this.closest('#transcript-panel').remove()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;">✕</button>
+    `
+    panel.appendChild(header)
+    const content = document.createElement('div')
+    content.id = 'transcript-content'
+    content.style.cssText = 'padding: 10px 12px;'
+    panel.appendChild(content)
+    document.body.appendChild(panel)
+  }
+
+  const content = document.getElementById('transcript-content')
+  content.innerHTML = lines.map(line => {
+    let color = 'var(--text-dim)'
+    if (line.startsWith('ERROR') || line.startsWith('FATAL')) color = 'var(--red)'
+    else if (line.startsWith('WARN')) color = 'var(--yellow)'
+    else if (line.includes('>>') || line.includes('Sending')) color = 'var(--accent)'
+    else if (line.includes('<<') || line.includes('250')) color = 'var(--green)'
+    return `<div style="color:${color}; white-space: pre-wrap; word-break: break-all;">${line}</div>`
+  }).join('')
 }
 
 // ── Event wiring ──
