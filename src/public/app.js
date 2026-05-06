@@ -364,13 +364,8 @@ async function send() {
 }
 
 // ── API key ──
-// Read from meta tag injected by server, or fallback to env-injected window var,
-// or prompt once and cache in sessionStorage for convenience during a session.
 function getApiKey() {
-  // If server injects window.PORT587_API_KEY via a script tag or similar, use it.
   if (window.PORT587_API_KEY) return window.PORT587_API_KEY
-
-  // Otherwise fall back to sessionStorage prompt (dev convenience)
   let key = sessionStorage.getItem('port587_api_key')
   if (!key) {
     key = prompt('Enter API key:') || ''
@@ -379,50 +374,51 @@ function getApiKey() {
   return key
 }
 
+// ── Transcript panel ──
 function showTranscript(lines) {
   let panel = document.getElementById('transcript-panel')
-  if (!panel) {
-    panel = document.createElement('div')
-    panel.id = 'transcript-panel'
-    panel.style.cssText = `
-      position: fixed;
-      bottom: 60px;
-      right: 24px;
-      width: 600px;
-      max-height: 400px;
-      background: var(--bg);
-      border: 1px solid var(--border-active);
-      border-radius: 6px;
-      overflow-y: auto;
-      z-index: 150;
-      font-family: var(--mono);
-      font-size: 11px;
-      line-height: 1.6;
-    `
-    const header = document.createElement('div')
-    header.style.cssText = `
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      background: var(--bg);
-    `
-    header.innerHTML = `
-      <span style="color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; font-size: 10px;">SMTP Transcript</span>
-      <button onclick="this.closest('#transcript-panel').remove()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;">✕</button>
-    `
-    panel.appendChild(header)
-    const content = document.createElement('div')
-    content.id = 'transcript-content'
-    content.style.cssText = 'padding: 10px 12px;'
-    panel.appendChild(content)
-    document.body.appendChild(panel)
-  }
+  if (panel) panel.remove()
 
-  const content = document.getElementById('transcript-content')
+  panel = document.createElement('div')
+  panel.id = 'transcript-panel'
+  panel.style.cssText = `
+    position: fixed;
+    bottom: 60px;
+    right: 24px;
+    width: 640px;
+    max-height: 400px;
+    background: var(--bg);
+    border: 1px solid var(--border-active);
+    border-radius: 6px;
+    overflow-y: auto;
+    z-index: 300;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+  `
+
+  const header = document.createElement('div')
+  header.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+  `
+  header.innerHTML = `
+    <span style="color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; font-size: 10px;">SMTP Transcript</span>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button id="transcript-copy" style="background:none;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:3px;">Copy All</button>
+      <button onclick="document.getElementById('transcript-panel').remove()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;">✕</button>
+    </div>
+  `
+
+  const content = document.createElement('div')
+  content.id = 'transcript-content'
+  content.style.cssText = 'padding: 10px 12px;'
   content.innerHTML = lines.map(line => {
     let color = 'var(--text-dim)'
     if (line.startsWith('ERROR') || line.startsWith('FATAL')) color = 'var(--red)'
@@ -431,6 +427,161 @@ function showTranscript(lines) {
     else if (line.includes('<<') || line.includes('250')) color = 'var(--green)'
     return `<div style="color:${color}; white-space: pre-wrap; word-break: break-all;">${line}</div>`
   }).join('')
+
+  panel.appendChild(header)
+  panel.appendChild(content)
+  document.body.appendChild(panel)
+
+  document.getElementById('transcript-copy').addEventListener('click', () => {
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      const btn = document.getElementById('transcript-copy')
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy All', 2000) }
+    })
+  })
+}
+
+// ── Log panel ──
+async function openLogPanel() {
+  const apiKey = getApiKey()
+  let data
+  try {
+    const res = await fetch('/api/logs', { headers: { 'x-api-key': apiKey } })
+    data = await res.json()
+  } catch (err) {
+    alert('Failed to load logs: ' + err.message)
+    return
+  }
+
+  let panel = document.getElementById('log-panel')
+  if (panel) panel.remove()
+
+  panel = document.createElement('div')
+  panel.id = 'log-panel'
+  panel.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `
+
+  const inner = document.createElement('div')
+  inner.style.cssText = `
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 860px;
+    max-width: 95vw;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  `
+
+  const header = document.createElement('div')
+  header.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  `
+  header.innerHTML = `
+    <span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);letter-spacing:1px;text-transform:uppercase;">Transaction Log</span>
+    <button onclick="document.getElementById('log-panel').remove()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px;">✕</button>
+  `
+
+  const body = document.createElement('div')
+  body.style.cssText = 'overflow-y: auto; flex: 1;'
+
+  const transactions = data.transactions || []
+
+  if (transactions.length === 0) {
+    body.innerHTML = `<div style="padding:40px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--text-dimmer);">No transactions yet.</div>`
+  } else {
+    transactions.forEach((t) => {
+      const entry = document.createElement('div')
+      entry.style.cssText = `
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+      `
+      const resultColor = t.result === 'success' ? 'var(--green)' : 'var(--red)'
+      const date = new Date(t.timestamp).toLocaleString()
+      entry.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-family:var(--mono);font-size:11px;color:${resultColor};text-transform:uppercase;font-weight:600;">${t.result}</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text-dimmer);">${date}</span>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text);margin-bottom:3px;">
+          <span style="color:var(--text-dimmer);">from</span> ${t.from}
+          <span style="color:var(--text-dimmer);margin-left:10px;">to</span> ${t.to}
+        </div>
+        <div style="font-family:var(--sans);font-size:12px;color:var(--text-dim);margin-top:4px;">${t.subject}</div>
+        ${t.messageId ? `<div style="font-family:var(--mono);font-size:10px;color:var(--text-dimmer);margin-top:4px;">${t.messageId}</div>` : ''}
+        ${t.transcript && t.transcript.length ? `<div style="margin-top:8px;"><button class="view-transcript-btn" style="font-family:var(--mono);font-size:10px;background:none;border:1px solid var(--border);color:var(--text-dim);padding:3px 8px;border-radius:3px;cursor:pointer;">View Transcript</button></div>` : ''}
+      `
+
+      const btn = entry.querySelector('.view-transcript-btn')
+      if (btn) {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation()
+          body.innerHTML = ''
+
+          const backBar = document.createElement('div')
+          backBar.style.cssText = `
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          `
+          backBar.innerHTML = `
+            <button id="back-to-log" style="font-family:var(--mono);font-size:11px;background:none;border:1px solid var(--border);color:var(--text-dim);padding:4px 10px;border-radius:3px;cursor:pointer;">← Back to Log</button>
+            <button id="transcript-copy-log" style="font-family:var(--mono);font-size:11px;background:none;border:1px solid var(--border);color:var(--text-dim);padding:4px 10px;border-radius:3px;cursor:pointer;">Copy All</button>
+          `
+          body.appendChild(backBar)
+
+          const transcriptContent = document.createElement('div')
+          transcriptContent.style.cssText = 'padding:10px 20px;font-family:var(--mono);font-size:11px;line-height:1.6;'
+          transcriptContent.innerHTML = t.transcript.map(line => {
+            let color = 'var(--text-dim)'
+            if (line.startsWith('ERROR') || line.startsWith('FATAL')) color = 'var(--red)'
+            else if (line.startsWith('WARN')) color = 'var(--yellow)'
+            else if (line.includes('>>') || line.includes('Sending')) color = 'var(--accent)'
+            else if (line.includes('<<') || line.includes('250')) color = 'var(--green)'
+            return `<div style="color:${color};white-space:pre-wrap;word-break:break-all;">${line}</div>`
+          }).join('')
+          body.appendChild(transcriptContent)
+
+          backBar.querySelector('#back-to-log').addEventListener('click', () => {
+            openLogPanel()
+          })
+
+          backBar.querySelector('#transcript-copy-log').addEventListener('click', () => {
+            navigator.clipboard.writeText(t.transcript.join('\n')).then(() => {
+              const copyBtn = document.getElementById('transcript-copy-log')
+              if (copyBtn) { copyBtn.textContent = 'Copied!'; setTimeout(() => copyBtn.textContent = 'Copy All', 2000) }
+            })
+          })
+        })
+      }
+
+      body.appendChild(entry)
+    })
+  }
+
+  inner.appendChild(header)
+  inner.appendChild(body)
+  panel.appendChild(inner)
+  document.body.appendChild(panel)
+
+  panel.addEventListener('click', (e) => {
+    if (e.target === panel) panel.remove()
+  })
 }
 
 // ── Event wiring ──
@@ -451,6 +602,7 @@ $('btn-modal-cancel').addEventListener('click', closeProfileModal)
 $('btn-modal-save').addEventListener('click', saveProfile)
 $('btn-clear').addEventListener('click', clearCompose)
 $('btn-send').addEventListener('click', send)
+$('btn-log').addEventListener('click', openLogPanel)
 
 // Close modal on backdrop click
 elModalProfile.addEventListener('click', (e) => {

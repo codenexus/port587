@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import nodemailer from 'nodemailer'
+import { appendTransaction } from './logs'
 
 const mail = new Hono()
 
@@ -27,6 +28,10 @@ interface SendPayload {
   body: string
 }
 
+function formatArgs(args: any[]): string {
+  return args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+}
+
 mail.post('/send', async (c) => {
   let payload: SendPayload
 
@@ -42,6 +47,9 @@ mail.post('/send', async (c) => {
     return c.json({ error: 'Missing required fields: profile, from, to, subject, body' }, 400)
   }
 
+  const transactionId = crypto.randomUUID()
+  const timestamp = new Date().toISOString()
+
   try {
     if (profile.type === 'smtp') {
       const { host, port, security, username, password } = profile
@@ -49,7 +57,6 @@ mail.post('/send', async (c) => {
       const secure = security === 'tls'
       const requireTLS = security === 'starttls'
 
-      // Capture debug transcript
       const transcript: string[] = []
 
       const transporter = nodemailer.createTransport({
@@ -58,18 +65,16 @@ mail.post('/send', async (c) => {
         secure,
         requireTLS,
         auth: username ? { user: username, pass: password } : undefined,
-        tls: {
-          rejectUnauthorized: false,
-        },
+        tls: { rejectUnauthorized: false },
         debug: true,
         logger: {
           level: () => {},
-          trace: (...args: any[]) => { const line = args.join(' '); transcript.push(`TRACE ${line}`); console.log('SMTP TRACE:', line) },
-          debug: (...args: any[]) => { const line = args.join(' '); transcript.push(`DEBUG ${line}`); console.log('SMTP DEBUG:', line) },
-          info:  (...args: any[]) => { const line = args.join(' '); transcript.push(`INFO  ${line}`); console.log('SMTP INFO:', line) },
-          warn:  (...args: any[]) => { const line = args.join(' '); transcript.push(`WARN  ${line}`); console.warn('SMTP WARN:', line) },
-          error: (...args: any[]) => { const line = args.join(' '); transcript.push(`ERROR ${line}`); console.error('SMTP ERROR:', line) },
-          fatal: (...args: any[]) => { const line = args.join(' '); transcript.push(`FATAL ${line}`); console.error('SMTP FATAL:', line) },
+          trace: (...args: any[]) => { const line = `TRACE ${formatArgs(args.slice(1))}`; transcript.push(line); console.log(line) },
+          debug: (...args: any[]) => { const line = `DEBUG ${formatArgs(args.slice(1))}`; transcript.push(line); console.log(line) },
+          info:  (...args: any[]) => { const line = `INFO  ${formatArgs(args.slice(1))}`; transcript.push(line); console.log(line) },
+          warn:  (...args: any[]) => { const line = `WARN  ${formatArgs(args.slice(1))}`; transcript.push(line); console.warn(line) },
+          error: (...args: any[]) => { const line = `ERROR ${formatArgs(args.slice(1))}`; transcript.push(line); console.error(line) },
+          fatal: (...args: any[]) => { const line = `FATAL ${formatArgs(args.slice(1))}`; transcript.push(line); console.error(line) },
         },
       })
 
@@ -81,6 +86,20 @@ mail.post('/send', async (c) => {
         text: body,
       })
 
+      await appendTransaction({
+        id: transactionId,
+        timestamp,
+        profile: { type: 'smtp', host, port, security, username },
+        from,
+        replyTo,
+        to,
+        subject,
+        result: 'success',
+        messageId: info.messageId,
+        response: info.response,
+        transcript,
+      })
+
       return c.json({
         success: true,
         messageId: info.messageId,
@@ -90,12 +109,8 @@ mail.post('/send', async (c) => {
     } else if (profile.type === 'http') {
       const { url, authHeader } = profile
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
-      if (authHeader) {
-        headers['Authorization'] = authHeader
-      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authHeader) headers['Authorization'] = authHeader
 
       const res = await fetch(url, {
         method: 'POST',
@@ -104,6 +119,20 @@ mail.post('/send', async (c) => {
       })
 
       const text = await res.text()
+
+      await appendTransaction({
+        id: transactionId,
+        timestamp,
+        profile: { type: 'http', url },
+        from,
+        replyTo,
+        to,
+        subject,
+        result: res.ok ? 'success' : 'error',
+        response: text,
+        transcript: [],
+      })
+
       if (!res.ok) {
         return c.json({ error: `Relay endpoint responded with ${res.status}: ${text}` }, 502)
       }
@@ -114,6 +143,20 @@ mail.post('/send', async (c) => {
     }
   } catch (err: any) {
     console.error('Send error:', err)
+
+    await appendTransaction({
+      id: transactionId,
+      timestamp,
+      profile,
+      from,
+      replyTo,
+      to,
+      subject,
+      result: 'error',
+      error: err.message,
+      transcript: [],
+    })
+
     return c.json({ error: err.message || 'Failed to send message' }, 500)
   }
 })
