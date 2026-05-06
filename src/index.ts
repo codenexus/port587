@@ -4,6 +4,7 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import mailRouter from './routes/mail'
 import logsRouter from './routes/logs'
+import profilesRouter from './routes/profiles'
 
 const app = new Hono()
 
@@ -24,6 +25,7 @@ app.use('/api/*', async (c, next) => {
 
 app.route('/api', mailRouter)
 app.route('/api/logs', logsRouter)
+app.route('/api/profiles', profilesRouter)
 
 app.use('/*', serveStatic({ root: './src/public' }))
 app.get('/', serveStatic({ path: './src/public/index.html' }))

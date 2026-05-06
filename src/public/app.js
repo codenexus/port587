@@ -4,8 +4,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Storage keys ──
-const KEY_PROFILES = 'port587_profiles'
-const KEY_ACTIVE   = 'port587_active_profile'
+const KEY_ACTIVE = 'port587_active_profile'
 
 // ── State ──
 let profiles = []
@@ -145,20 +144,69 @@ const elTo      = $('f-to')
 const elSubject = $('f-subject')
 const elBody    = $('f-body')
 
-// ── Profile persistence ──
-function loadProfiles() {
-  try {
-    profiles = JSON.parse(localStorage.getItem(KEY_PROFILES) || '[]')
-    activeProfileId = localStorage.getItem(KEY_ACTIVE) || null
-  } catch {
-    profiles = []
+// ── API helpers ──
+function getApiKey() {
+  if (window.PORT587_API_KEY) return window.PORT587_API_KEY
+  let key = sessionStorage.getItem('port587_api_key')
+  if (!key) {
+    key = prompt('Enter API key:') || ''
+    if (key) sessionStorage.setItem('port587_api_key', key)
+  }
+  return key
+}
+
+function apiHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'x-api-key': getApiKey(),
   }
 }
 
-function saveProfiles() {
-  localStorage.setItem(KEY_PROFILES, JSON.stringify(profiles))
-  if (activeProfileId) localStorage.setItem(KEY_ACTIVE, activeProfileId)
-  else localStorage.removeItem(KEY_ACTIVE)
+// ── Profile API ──
+async function fetchProfiles() {
+  const res = await fetch('/api/profiles', { headers: apiHeaders() })
+  const data = await res.json()
+  return data.profiles || []
+}
+
+async function createProfile(profile) {
+  const res = await fetch('/api/profiles', {
+    method: 'POST',
+    headers: apiHeaders(),
+    body: JSON.stringify(profile),
+  })
+  return res.json()
+}
+
+async function updateProfile(id, profile) {
+  const res = await fetch(`/api/profiles/${id}`, {
+    method: 'PUT',
+    headers: apiHeaders(),
+    body: JSON.stringify(profile),
+  })
+  return res.json()
+}
+
+async function deleteProfileApi(id) {
+  await fetch(`/api/profiles/${id}`, {
+    method: 'DELETE',
+    headers: apiHeaders(),
+  })
+}
+
+// ── Profile UI ──
+async function loadProfiles() {
+  try {
+    profiles = await fetchProfiles()
+    activeProfileId = localStorage.getItem(KEY_ACTIVE) || null
+    // If saved active ID no longer exists, clear it
+    if (activeProfileId && !profiles.find((p) => p.id === activeProfileId)) {
+      activeProfileId = null
+      localStorage.removeItem(KEY_ACTIVE)
+    }
+  } catch {
+    profiles = []
+  }
 }
 
 function renderProfiles() {
@@ -211,14 +259,14 @@ function openProfileModal(editId = null) {
   const p = editId ? profiles.find((x) => x.id === editId) : null
 
   elModalTitle.textContent = p ? 'Edit Profile' : 'New Profile'
-  $('p-name').value     = p?.name || ''
-  $('p-type').value     = p?.type || 'smtp'
-  $('p-host').value     = p?.host || ''
-  $('p-port').value     = p?.port || 587
-  $('p-security').value = p?.security || 'starttls'
-  $('p-username').value = p?.username || ''
-  $('p-password').value = p?.password || ''
-  $('p-url').value      = p?.url || ''
+  $('p-name').value        = p?.name || ''
+  $('p-type').value        = p?.type || 'smtp'
+  $('p-host').value        = p?.host || ''
+  $('p-port').value        = p?.port || 587
+  $('p-security').value    = p?.security || 'starttls'
+  $('p-username').value    = p?.username || ''
+  $('p-password').value    = p?.password || ''
+  $('p-url').value         = p?.url || ''
   $('p-auth-header').value = p?.authHeader || ''
 
   toggleModalType(p?.type || 'smtp')
@@ -236,7 +284,7 @@ function toggleModalType(type) {
   elHttpFields.className = 'http-fields' + (type === 'http' ? ' active' : '')
 }
 
-function saveProfile() {
+async function saveProfile() {
   const name = $('p-name').value.trim()
   const type = elPType.value
 
@@ -257,25 +305,28 @@ function saveProfile() {
   }
 
   if (editingProfileId) {
-    profiles = profiles.map((p) => p.id === editingProfileId ? profile : p)
+    await updateProfile(editingProfileId, profile)
   } else {
-    profiles.push(profile)
+    await createProfile(profile)
     activeProfileId = profile.id
+    localStorage.setItem(KEY_ACTIVE, activeProfileId)
   }
 
-  saveProfiles()
+  profiles = await fetchProfiles()
   renderProfiles()
   closeProfileModal()
 }
 
-function deleteProfile() {
+async function deleteProfile() {
   if (!activeProfileId) return
   const p = profiles.find((x) => x.id === activeProfileId)
   if (!p || !confirm(`Delete profile "${p.name}"?`)) return
 
-  profiles = profiles.filter((x) => x.id !== activeProfileId)
+  await deleteProfileApi(activeProfileId)
+  profiles = await fetchProfiles()
   activeProfileId = profiles[0]?.id || null
-  saveProfiles()
+  if (activeProfileId) localStorage.setItem(KEY_ACTIVE, activeProfileId)
+  else localStorage.removeItem(KEY_ACTIVE)
   renderProfiles()
 }
 
@@ -329,15 +380,10 @@ async function send() {
   setStatus('sending…', 'sending')
   $('btn-send').disabled = true
 
-  const apiKey = getApiKey()
-
   try {
     const res = await fetch('/api/send', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
+      headers: apiHeaders(),
       body: JSON.stringify({
         profile,
         from,
@@ -361,17 +407,6 @@ async function send() {
   } finally {
     $('btn-send').disabled = false
   }
-}
-
-// ── API key ──
-function getApiKey() {
-  if (window.PORT587_API_KEY) return window.PORT587_API_KEY
-  let key = sessionStorage.getItem('port587_api_key')
-  if (!key) {
-    key = prompt('Enter API key:') || ''
-    if (key) sessionStorage.setItem('port587_api_key', key)
-  }
-  return key
 }
 
 // ── Transcript panel ──
@@ -442,10 +477,9 @@ function showTranscript(lines) {
 
 // ── Log panel ──
 async function openLogPanel() {
-  const apiKey = getApiKey()
   let data
   try {
-    const res = await fetch('/api/logs', { headers: { 'x-api-key': apiKey } })
+    const res = await fetch('/api/logs', { headers: apiHeaders() })
     data = await res.json()
   } catch (err) {
     alert('Failed to load logs: ' + err.message)
@@ -505,10 +539,7 @@ async function openLogPanel() {
   } else {
     transactions.forEach((t) => {
       const entry = document.createElement('div')
-      entry.style.cssText = `
-        padding: 14px 20px;
-        border-bottom: 1px solid var(--border);
-      `
+      entry.style.cssText = `padding: 14px 20px; border-bottom: 1px solid var(--border);`
       const resultColor = t.result === 'success' ? 'var(--green)' : 'var(--red)'
       const date = new Date(t.timestamp).toLocaleString()
       entry.innerHTML = `
@@ -557,9 +588,7 @@ async function openLogPanel() {
           }).join('')
           body.appendChild(transcriptContent)
 
-          backBar.querySelector('#back-to-log').addEventListener('click', () => {
-            openLogPanel()
-          })
+          backBar.querySelector('#back-to-log').addEventListener('click', () => openLogPanel())
 
           backBar.querySelector('#transcript-copy-log').addEventListener('click', () => {
             navigator.clipboard.writeText(t.transcript.join('\n')).then(() => {
@@ -587,7 +616,8 @@ async function openLogPanel() {
 // ── Event wiring ──
 elProfileSelect.addEventListener('change', () => {
   activeProfileId = elProfileSelect.value || null
-  localStorage.setItem(KEY_ACTIVE, activeProfileId || '')
+  if (activeProfileId) localStorage.setItem(KEY_ACTIVE, activeProfileId)
+  else localStorage.removeItem(KEY_ACTIVE)
   renderProfileDetail()
 })
 
@@ -604,12 +634,15 @@ $('btn-clear').addEventListener('click', clearCompose)
 $('btn-send').addEventListener('click', send)
 $('btn-log').addEventListener('click', openLogPanel)
 
-// Close modal on backdrop click
 elModalProfile.addEventListener('click', (e) => {
   if (e.target === elModalProfile) closeProfileModal()
 })
 
 // ── Init ──
-loadProfiles()
-renderProfiles()
-renderTemplates()
+async function init() {
+  await loadProfiles()
+  renderProfiles()
+  renderTemplates()
+}
+
+init()

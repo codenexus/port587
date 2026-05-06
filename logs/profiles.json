@@ -1,0 +1,12 @@
+[
+  {
+    "id": "1f946557-3aa2-44c5-a81b-39147514e082",
+    "name": "Maclean M365 Relay",
+    "type": "smtp",
+    "host": "macleanhealth-com.mail.protection.outlook.com",
+    "port": 25,
+    "security": "none",
+    "username": "",
+    "password": ""
+  }
+]
