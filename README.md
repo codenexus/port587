@@ -74,7 +74,7 @@ curl -L https://fly.io/install.sh | sh
 fly auth login
 ```
 
-Launch the app (use the existing `fly.toml` when prompted):
+Launch the app — this generates your own `fly.toml` (the repo intentionally excludes one since app names and regions vary):
 
 ```bash
 fly launch --no-deploy
