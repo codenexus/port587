@@ -613,6 +613,12 @@ async function openLogPanel() {
   })
 }
 
+function resetApiKey() {
+  sessionStorage.removeItem('port587_api_key')
+  const key = prompt('Enter API key:') || ''
+  if (key) sessionStorage.setItem('port587_api_key', key)
+}
+
 // ── Event wiring ──
 elProfileSelect.addEventListener('change', () => {
   activeProfileId = elProfileSelect.value || null
@@ -633,6 +639,7 @@ $('btn-modal-save').addEventListener('click', saveProfile)
 $('btn-clear').addEventListener('click', clearCompose)
 $('btn-send').addEventListener('click', send)
 $('btn-log').addEventListener('click', openLogPanel)
+$('btn-apikey').addEventListener('click', resetApiKey)
 
 elModalProfile.addEventListener('click', (e) => {
   if (e.target === elModalProfile) closeProfileModal()
