@@ -29,7 +29,22 @@ interface SendPayload {
 }
 
 function formatArgs(args: any[]): string {
-  return args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+  if (args.length === 0) return ''
+  let msg = typeof args[0] === 'string' ? args[0] : JSON.stringify(args[0])
+  let i = 1
+  msg = msg.replace(/%s/g, () => {
+    if (i < args.length) {
+      const val = args[i++]
+      return typeof val === 'object' ? JSON.stringify(val) : String(val)
+    }
+    return '%s'
+  })
+  // Append any remaining args not consumed by %s
+  while (i < args.length) {
+    const val = args[i++]
+    msg += ' ' + (typeof val === 'object' ? JSON.stringify(val) : String(val))
+  }
+  return msg
 }
 
 mail.post('/send', async (c) => {
