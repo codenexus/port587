@@ -106,7 +106,7 @@ Deploy:
 fly deploy
 ```
 
-App will be live at `https://port587.fly.dev`.
+App will be live at `https://<your-app-name>.fly.dev`.
 
 ### Subsequent deploys
 
@@ -134,13 +134,16 @@ Or push to GitHub if you've set up a CI/CD pipeline.
 ### Setup
 
 1. In Coolify, go to **Sources** and connect your GitHub account via a GitHub App
-2. Go to **Projects** → your project → **New Resource** → **Private Repository (with GitHub App)**
-3. Select `port587`, set build pack to **Dockerfile**, click **Continue**
+2. Go to **Projects** → your project → **New Resource** → **Private Repository (with GitHub App)** (also works for public repos — provides auto-deploy on push)
+
+   > **Note**: You must have completed the GitHub App installation in Sources before the repository will appear in the dropdown.
+
+3. Select the `port587` repository from the dropdown, set build pack to **Dockerfile**, click **Continue**
 4. Set the domain to `https://port587.yourdomain.com`
 5. Go to **Environment Variables** and add `API_KEY` with a strong value:
-   ```bash
+```bash
    openssl rand -hex 32
-   ```
+```
 6. Go to **Persistent Storage** → **Add** → **Volume Mount**:
    - **Name**: `port587-logs`
    - **Destination Path**: `/app/logs`
