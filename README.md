@@ -129,7 +129,7 @@ Or push to GitHub if you've set up a CI/CD pipeline.
 
 - A server running Coolify (see [coolify.io](https://coolify.io))
 - A domain pointed at your server via an A record
-- Port 80 and 443 open inbound, port 25 open outbound for SMTP relay
+- Ports 80 and 443 open inbound, ports 25, 587, 465, and 2525 open outbound for SMTP relay testing
 
 ### Setup
 
