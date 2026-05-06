@@ -198,14 +198,20 @@ async function deleteProfileApi(id) {
 async function loadProfiles() {
   try {
     profiles = await fetchProfiles()
-    activeProfileId = localStorage.getItem(KEY_ACTIVE) || null
-    // If saved active ID no longer exists, clear it
-    if (activeProfileId && !profiles.find((p) => p.id === activeProfileId)) {
+    const saved = localStorage.getItem(KEY_ACTIVE)
+
+    if (saved && profiles.find((p) => p.id === saved)) {
+      activeProfileId = saved
+    } else if (profiles.length > 0) {
+      activeProfileId = profiles[0].id
+      localStorage.setItem(KEY_ACTIVE, activeProfileId)
+    } else {
       activeProfileId = null
       localStorage.removeItem(KEY_ACTIVE)
     }
   } catch {
     profiles = []
+    activeProfileId = null
   }
 }
 
@@ -240,7 +246,7 @@ function renderProfileDetail() {
   let rows = ''
   if (p.type === 'smtp') {
     rows = `
-      <div class="kv"><span class="k">host</span><span class="v">${p.host}</span></div>
+      <div class="kv"><span class="k">host</span><span class="v" style="word-break:break-all;">${p.host}</span></div>
       <div class="kv"><span class="k">port</span><span class="v">${p.port}</span></div>
       <div class="kv"><span class="k">security</span><span class="v">${p.security.toUpperCase()}</span></div>
       ${p.username ? `<div class="kv"><span class="k">user</span><span class="v">${p.username}</span></div>` : ''}
